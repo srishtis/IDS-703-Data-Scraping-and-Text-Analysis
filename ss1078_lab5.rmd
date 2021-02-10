@@ -1,0 +1,363 @@
+---
+title: "Lab 5: Topic Modeling"
+output: pdf_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Srishti Saha (ss1078)"
+always_allow_html: yes
+geometry: margin= 0.8cm
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=15, fig.height=8, warning=FALSE, echo=FALSE ,message=FALSE, fig.align = "center", out.width = '60%')
+```
+
+```{r echo=FALSE}
+library(tidytext)
+library(dplyr)
+library(kableExtra)
+library(tm)
+library(topicmodels)
+library(stringr)
+library(ggplot2)
+library(reshape)
+library(tidyverse)
+library("ldatuning")
+```
+
+
+
+## Exercise 1: Using the link above and the downloaded file, load the lyrics dataset into your workspace.
+
+```{r}
+billboard_data<- read.csv("billboard_lyrics_1964-2015.csv",stringsAsFactors = FALSE, sep = ",")
+
+knitr::kable(
+head(billboard_data,5),
+format = 'latex',
+caption="Top 5 rows from billboard data",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(2, width = "10em")%>%
+  column_spec(3, width = "5em")%>%
+  column_spec(5, width = "35em")
+```
+
+
+## Exercise 2: Subset the data into “decades of lyrics” so that each new dataframe contains the lyrics and other columns from a particular decade of music. Use the following decades so that each has a dataset of song lyrics: 1965-1974, 1975-1984, 1985-1994, 1995-2004, 2005-2014.
+
+```{r echo=TRUE}
+data_1965_1974 <- subset(billboard_data, Year<=1974 & Year>=1965)
+data_1975_1984 <- subset(billboard_data, Year<=1984 & Year>=1975)
+data_1985_1994 <- subset(billboard_data, Year<=1994 & Year>=1985)
+data_1995_2004 <- subset(billboard_data, Year<=2004 & Year>=1995)
+data_2005_2014 <- subset(billboard_data, Year<=2014 & Year>=2005)
+```
+
+## Exercise 3: Prepare each of the datasets so that it can be analyzed using the topicmodels package.
+
+```{r}
+data_1st_decade<-data_1965_1974%>% dplyr::select(Song,Lyrics)
+data_2nd_decade<-data_1975_1984%>% dplyr::select(Song,Lyrics)
+data_3rd_decade<-data_1985_1994%>% dplyr::select(Song,Lyrics)
+data_4th_decade<-data_1995_2004%>% dplyr::select(Song,Lyrics)
+data_5th_decade<-data_2005_2014%>% dplyr::select(Song,Lyrics)
+```
+
+The first step was to select the relevant columns. We will now create a tidy text.
+
+```{r}
+
+tidy_reviews1<-data_1st_decade %>%
+    unnest_tokens("word", Lyrics)
+tidy_reviews2<-data_2nd_decade %>%
+    unnest_tokens("word", Lyrics)
+tidy_reviews3<-data_3rd_decade %>%
+    unnest_tokens("word", Lyrics)
+tidy_reviews4<-data_4th_decade %>%
+    unnest_tokens("word", Lyrics)
+tidy_reviews5<-data_5th_decade %>%
+    unnest_tokens("word", Lyrics)
+
+```
+
+
+We will conduct the following steps to preprocess this text data:
+
+* Removal of white spaces
+* Removing numbers
+* Removing intra-word punctiation
+* Lemmatization
+* Removing words of length less than 3 (short words)
+* Removal of Stop words
+* Converting to lower case words (done automatically for tidytext objects)
+
+
+### White Spaces
+
+```{r echo=TRUE}
+# removing white spaces
+tidy_reviews1$word <- gsub("\\s+","",tidy_reviews1$word)
+tidy_reviews2$word <- gsub("\\s+","",tidy_reviews2$word)
+tidy_reviews3$word <- gsub("\\s+","",tidy_reviews3$word)
+tidy_reviews4$word <- gsub("\\s+","",tidy_reviews4$word)
+tidy_reviews5$word <- gsub("\\s+","",tidy_reviews5$word)
+```
+
+### Removing Numbers
+
+```{r echo=TRUE}
+# removing numbers from the words list
+tidy_reviews1<-tidy_reviews1[-grep("\\b\\d+\\b", tidy_reviews1$word),]
+tidy_reviews2<-tidy_reviews2[-grep("\\b\\d+\\b", tidy_reviews2$word),]
+tidy_reviews3<-tidy_reviews3[-grep("\\b\\d+\\b", tidy_reviews3$word),]
+tidy_reviews4<-tidy_reviews4[-grep("\\b\\d+\\b", tidy_reviews4$word),]
+tidy_reviews5<-tidy_reviews5[-grep("\\b\\d+\\b", tidy_reviews5$word),]
+```
+
+### Punctuation
+
+Although interword punctuation is removed in tidytext automatically, we will remove intraword punctuations separately.
+
+```{r echo=TRUE}
+# removing punctuation (intraword)
+tidy_reviews1$word<-removePunctuation(tidy_reviews1$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+
+tidy_reviews2$word<-removePunctuation(tidy_reviews2$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+
+tidy_reviews3$word<-removePunctuation(tidy_reviews3$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+
+tidy_reviews4$word<-removePunctuation(tidy_reviews4$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+
+tidy_reviews5$word<-removePunctuation(tidy_reviews5$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+```
+
+### Lemmatization
+
+```{r echo=TRUE}
+#Lemmatization
+tidy_reviews1<-tidy_reviews1  %>%
+  mutate(word = textstem::lemmatize_words(word))
+
+tidy_reviews2<-tidy_reviews2  %>%
+  mutate(word = textstem::lemmatize_words(word))
+
+tidy_reviews3<-tidy_reviews3  %>%
+  mutate(word = textstem::lemmatize_words(word))
+
+tidy_reviews4<-tidy_reviews4  %>%
+  mutate(word = textstem::lemmatize_words(word))
+
+tidy_reviews5<-tidy_reviews5  %>%
+  mutate(word = textstem::lemmatize_words(word))
+```
+
+### Removing short words
+
+```{r}
+tidy_reviews1$word<-gsub('\\b\\w{1,2}\\b',"",tidy_reviews1$word)
+tidy_reviews2$word<-gsub('\\b\\w{1,2}\\b',"",tidy_reviews2$word)
+tidy_reviews3$word<-gsub('\\b\\w{1,2}\\b',"",tidy_reviews3$word)
+tidy_reviews4$word<-gsub('\\b\\w{1,2}\\b',"",tidy_reviews4$word)
+tidy_reviews5$word<-gsub('\\b\\w{1,2}\\b',"",tidy_reviews5$word)
+```
+
+```{r}
+tidy_reviews2 %>%
+  dplyr::count(word) %>%
+    arrange(desc(n))
+```
+
+### Stop words
+
+```{r echo=TRUE}
+data("stop_words")
+
+stop_words2= as.data.frame(c("im","yes","you","gonna","", "gotta","wanna","la","thoia","dem","dat","aint","shes","youre","tu","uh","na","ah","gon"))
+names(stop_words2)[1]<- "word"
+
+##### for first decade
+# remove the stop words in the list above
+tidy_reviews1<-tidy_reviews1 %>%
+      anti_join(stop_words)
+
+# from custom list
+tidy_reviews1<-tidy_reviews1 %>%
+      anti_join(stop_words2)
+
+
+##### for second decade
+tidy_reviews2<-tidy_reviews2 %>%
+      anti_join(stop_words)
+
+tidy_reviews2<-tidy_reviews2 %>%
+      anti_join(stop_words2)
+
+
+##### for third decade
+tidy_reviews3<-tidy_reviews3 %>%
+      anti_join(stop_words)
+
+tidy_reviews3<-tidy_reviews3 %>%
+      anti_join(stop_words2)
+
+##### for fourth decade
+tidy_reviews4<-tidy_reviews4 %>%
+      anti_join(stop_words)
+
+tidy_reviews4<-tidy_reviews4 %>%
+      anti_join(stop_words2)
+
+##### for fifth decade
+tidy_reviews5<-tidy_reviews5 %>%
+      anti_join(stop_words)
+
+tidy_reviews5<-tidy_reviews5 %>%
+      anti_join(stop_words2)
+```
+
+### Converting to lower case
+
+This step happens automatically in the tidytext format
+
+
+```{r}
+tidy_reviews2 %>%
+  dplyr::count(word) %>%
+    arrange(desc(n))
+```
+
+
+
+### Document Term matrix
+
+```{r echo=TRUE}
+## DTM from tidytext
+DTM1<-  tidy_reviews1 %>%
+  dplyr::count(Song, word) %>%
+  cast_dtm(Song, word, n)
+
+DTM2<-  tidy_reviews2 %>%
+  dplyr::count(Song, word) %>%
+  cast_dtm(Song, word, n)
+
+DTM3<-  tidy_reviews3 %>%
+  dplyr::count(Song, word) %>%
+  cast_dtm(Song, word, n)
+
+DTM4<-  tidy_reviews4 %>%
+  dplyr::count(Song, word) %>%
+  cast_dtm(Song, word, n)
+
+DTM5<-  tidy_reviews5 %>%
+  dplyr::count(Song, word) %>%
+  cast_dtm(Song, word, n)
+
+```
+
+
+
+## Exercise 4: Choose a single dataset and run three models to try and identify an appropriate value for k (the number of topics). State which value of k you choose after running these three models as well as why you picked those particular three values of k to run for each of your models.
+
+```{r}
+result <- FindTopicsNumber(
+  DTM4,
+  topics = seq(from = 2, to = 10, by = 1),
+  metrics = c("Griffiths2004", "CaoJuan2009", "Arun2010", "Deveaud2014"),
+  method = "Gibbs",
+  control = list(seed = 77),
+  mc.cores = 2L,
+  verbose = TRUE
+)
+```
+
+```{r}
+FindTopicsNumber_plot(result)
+```
+
+I will be trying for three values of k: (5,6,8). I selected these values based on the plot obtained above. I looked at the minima and maxima of the metrics described above and made these choices. Growth from 8 to 10 in the metric 'Griffiths2004' to be maximized is not that steep. Hence, I am choosing 8 instead of 10.
+
+```{r}
+
+# writing a function that takes as input:
+## the array of k-values, 
+## the Document-term matrix and 
+##the number of top terms you want to see for each topics
+
+topic_model_k=function(DTM,k_array,n_top_terms,DTM_n){
+
+  
+for (i in 1:length(k_array)){
+  ki=k_array[i]
+  #create topic model
+topic_model1<-LDA(DTM, k=ki, control = list(seed = 321))
+
+topics1 <- tidy(topic_model1, matrix = "beta")
+
+top_terms1 <- 
+  topics1 %>%
+  group_by(topic) %>%
+  top_n(n_top_terms, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+
+top_terms1<-top_terms1 %>%
+  mutate(term = reorder(term, beta)) 
+
+  print(ggplot(top_terms1,aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  ggtitle(paste0("Top ", n_top_terms," terms across topics for decade:",DTM_n," and k:",ki)) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip())
+}
+}
+
+
+```
+
+
+```{r}
+topic_model_k(DTM4,c(5,6,8),7,4)
+```
+
+
+I am selecting k=5 as the 5th topic shows some diversity in the sense it has words like 'bitch', 'nigga', 'shit' etc. which may indicate songs not suitable for all people (or age groups). These lyrics could be offensive. All other topics have similar phrases. As the value of k, (for instance 6 and 8), we get repetitive topics of the same kind (as the first 4). Thus, I will extract 5 topics.
+
+## Exercise 5: Using the same value of k, run a model on each of the other decades lyrics datasets
+
+Please note that for the ease of coding, I had assigned the following number to each decade:
+
+* 1: 1965-1974
+* 2: 1975-1984
+* 3: 1985-1994
+* 4: 1995-2004
+* 5: 2005-2014
+
+```{r}
+# extracting 5 topics from each decade
+print("For decade (1) 1965-1974...")
+topic_model_k(DTM1,c(5),7,1)
+print("For decade (2) 1975-1984...")
+topic_model_k(DTM2,c(5),7,2)
+print("For decade (3) 1985-1994...")
+topic_model_k(DTM3,c(5),7,3)
+print("For decade (4) 1995-2004...")
+topic_model_k(DTM4,c(5),7,4)
+print("For decade (5) 2005-2014...")
+topic_model_k(DTM5,c(5),7,5)
+```
+
+
+
+## Exercise 6: Based on your output, does it seem like your value of k was a good choice for all decades of lyrics?
+
+The value k=5 has created topics of varying degrees of uniqueness across topics. In some decades, it was not as successful. However, it seems to have quite well worked for a few other decades. For example, for decade 3 i.e.1985-1994, the topics seems to be very similar (except topic 4 which might contain words implying dance/party songs).
+
+However in decade 2 i.e. 1975-1984, the topics seems to be quite disparate with different top words.
+
+I believe it is also the kind of lyrics most songs have. It is difficult to create unique topics out of song lyrics as the genres will be similar. I believe, k=5 did a fair job of creating different topics out of song lyrics across decades. Although, it can be improved using more refined text preprocessing techniques, it was a fair choice for this example.

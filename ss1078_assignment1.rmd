@@ -1,0 +1,185 @@
+---
+title: "Lab 1 : Application Programming Interfaces"
+output: 
+  pdf_document
+author: "Srishti Saha (ss1078)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=7, fig.height=4,  warning=FALSE, message=FALSE, fig.align = "center", out.width = '55%')
+```
+
+```{r echo=FALSE, include=FALSE}
+library(devtools)
+#install.packages("rtweet")
+library(rtweet)
+library(maps)
+library(kableExtra)
+```
+
+
+## Question 1
+
+
+The first step is to create a token with create_token().
+
+```{r echo=FALSE, eval=FALSE}
+#Consumer:-
+#API key:8cv1xLNzhoWzqqNl1O9REXNbd
+#API secret key:YdWjEkBKzbQi4exKsrfvN2DpoZ869GIULY9XYbn8mgGWe8s2BE
+
+#Access token & access token secret:-
+#Access token :1366155116-nY6BRPP8mLtraZY2iVpDyz4w10Jj88ZdKHmwiUt
+#Access token secret :4xjJMolmfmCeCbIuWalre02YyEK9NldZLlmIWSI2VhJZ2
+
+app_name<-"Assignment1_ss1078"
+consumer_key<-"8cv1xLNzhoWzqqNl1O9REXNbd"
+consumer_secret<-"YdWjEkBKzbQi4exKsrfvN2DpoZ869GIULY9XYbn8mgGWe8s2BE"
+access_token<-"1366155116-nY6BRPP8mLtraZY2iVpDyz4w10Jj88ZdKHmwiUt"
+access_token_secret<-"4xjJMolmfmCeCbIuWalre02YyEK9NldZLlmIWSI2VhJZ2"
+
+```
+
+```{r eval=FALSE}
+create_token(
+  app             = app_name,
+  consumer_key    = consumer_key,
+  consumer_secret = consumer_secret,
+  access_token    = access_token,
+  access_secret   = access_token_secret
+) 
+```
+
+## Question 2
+
+Using get_timelines() to obtain the most recent 250 tweets from @espn.
+
+```{r}
+espn_tweets <- get_timelines(c("espn"), n = 250)
+head(espn_tweets$text,n=10)
+```
+
+The recent tweets are about Kobe Bryant which is in line with the events around his death. These tweets are about his life events or his daughter who was also involved in the accident. 
+
+## Question 3
+
+Obtain top favorites of Patrick Mahomes using get_favorites().
+
+```{r}
+patrick_favorites<-get_favorites("PatrickMahomes", n=1000)
+head(patrick_favorites$text,n=10)
+```
+
+## Question 4
+
+Getting the retweets and retweeters for Patrick's tweet (status ID: 857944539029483520)
+
+```{r}
+patrick_retweets<-get_retweets("857944539029483520", n=100)
+
+
+patrick_retweeters<-get_retweeters("857944539029483520", n=100)
+
+```
+
+```{r echo=FALSE}
+
+print("Following are the status IDs of the most recent retweets of the given status.")
+head(patrick_retweets$status_id,10)
+
+print("Following are the user IDs of users who retweeted a given status")
+head(patrick_retweeters,10)
+
+```
+
+
+## Question 5
+
+Getting Patrick's followers and friends using get_followers and get_friends.
+
+```{r}
+patrick_followers<-get_followers("PatrickMahomes")
+patrick_friends<-get_friends("PatrickMahomes")
+
+```
+
+```{r echo=FALSE}
+print("Following are 10 followers for Patrick Mahomes")
+head(patrick_followers,10)
+print("Following are 10 friends of Patrick Mahomes")
+head(patrick_friends,10)
+```
+
+
+## Question 6
+
+Using get_trends() to get the recent trends in Raleigh, NC.
+
+```{r}
+Raleigh_trends<-get_trends("Raleigh")
+head(Raleigh_trends$trend,10)
+```
+
+
+## Question 7
+
+Search tweets using key words or hashtags: superbowl and sbliv
+
+```{r}
+sb_tweets<-search_tweets("superbowl AND sbliv", n=5000, include_rts = FALSE)
+sb_tweets$text[1:10]
+```
+
+## Question 8
+
+Using stream_tweets to stream tweets for 2 minutes for the key words: kobe or bryant.
+
+```{r}
+sb_stream_tweets<-stream_tweets("kobe OR bryant", timeout = 120) # timeout= 120 seconds is 2 minutes
+sb_stream_tweets$text[1:10]
+```
+
+
+## Question 9
+
+Using ts_plot and ts_data to determine patterns or relevancy of post
+
+```{r}
+library(ggplot2)
+
+#Returns data containing the frequency of tweets over a specified interval of time.
+sbtweet_data<-ts_data(sb_tweets)
+sbtweet_data<-as.data.frame(sbtweet_data)
+kable(sbtweet_data, caption = "Trend of Superbowl retweets") %>% kable_styling(position = 'center')
+
+# getting trend plots of the streamed tweets
+ts_plot(sb_tweets, by= "days") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Frequency of Tweets about Superbowl from the Past Week",
+    subtitle = "Twitter status (tweet) counts aggregated using 1-day intervals",
+    caption = "\nSource: Data collected from Twitter's REST API via rtweet"
+  )
+```
+
+
+## Question 10
+
+plotting the geotagged tweets from Question 7
+
+```{r}
+geocoded <- lat_lng(sb_tweets)
+
+
+par(mar = c(0, 0, 0, 0))
+maps::map("state", lwd = .25)
+with(geocoded, points(lng, lat, pch = 20, cex = .75, col = rgb(0, .3, .7, .75)))
+```
+
+
+
+
+

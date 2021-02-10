@@ -1,0 +1,243 @@
+---
+title: "Lab 3: Basic Text Analysis"
+output: pdf_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Srishti Saha (ss1078)"
+always_allow_html: yes
+geometry: margin= 0.8cm
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=7, fig.height=4, warning=FALSE, message=FALSE, fig.align = "center", out.width = '40%')
+```
+
+```{r echo=FALSE}
+#install.packages("tidytext")
+library(text2vec)
+library(textstem)
+library(dplyr)
+library(tm)
+library(tidytext)
+```
+
+```{r echo=FALSE}
+# confirm upload of data frame
+#glimpse(movie_review)
+#head(movie_review$review,3)
+```
+
+
+## Question 1
+
+### Steps included (on the reviews dataset)
+
+* Removal of stop words
+* Remove intra and inter-word punctuations
+* Removal of white spaces
+* Lemmatization
+* Converting word case to lower
+
+### Steps excluded
+
+1. We will not be executing **removal of numbers** as they are present in all documents and refer to the index/ ID of the document. Moreover, numbers within the text might also carry important information. For instance, there are mentions of years- like 2002  and 10000 BC to refer to particular time lines. It is not wise to remove the same.
+
+
+## Question 2- Corpus
+
+```{r}
+# creating a corpus
+movies_review_corpus <- Corpus(VectorSource(as.vector(movie_review$review))) 
+movies_review_corpus
+```
+
+
+## Question 3- Tidy Text
+
+```{r}
+# transforming into tidytext format
+tidy_movie_reviews<- movie_review %>%
+    select(id,review, sentiment) %>%
+    unnest_tokens("word", review)
+head(tidy_movie_reviews,10)
+
+tidy_movie_reviews %>%
+  count(word) %>%
+    arrange(desc(n))
+```
+
+## Question 4- Pre processing on corpus format
+
+### Punctuation
+
+```{r}
+# removing punctuation
+movies_review_corpus <- tm_map(movies_review_corpus,content_transformer(removePunctuation))
+movies_review_corpus
+```
+
+### Stop words
+
+```{r}
+# create a concatenated dataset of stopwords to be removed
+stopwords1<- c(stopwords("english"),c("anyway","always"))
+# remove the stop words in the list above
+movies_review_corpus <- tm_map(movies_review_corpus, removeWords, stopwords1)
+movies_review_corpus
+```
+
+### White spaces
+
+```{r}
+# removing white spaces
+movies_review_corpus <- tm_map(movies_review_corpus, content_transformer(stripWhitespace))
+movies_review_corpus
+```
+
+### Lemmatization
+
+```{r}
+#Lemmatization
+movies_review_corpus <- tm_map(movies_review_corpus, lemmatize_strings)
+movies_review_corpus
+
+```
+
+
+### Converting to lower case
+
+```{r}
+# lower case conersion
+movies_review_corpus <- tm_map(movies_review_corpus,  content_transformer(tolower))
+movies_review_corpus
+```
+
+
+## Question 5- Pre processing on tidytext format
+
+### Punctuation
+
+Although interword punctuation is removed in tidytext automatically, we will remove intraword punctuations separately.
+
+```{r}
+# removing punctuation (intraword)
+tidy_movie_reviews$word<-removePunctuation(tidy_movie_reviews$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+
+tidy_movie_reviews %>%
+  count(word) %>%
+    arrange(desc(n))
+```
+
+
+### Stop words
+
+```{r}
+data("stop_words")
+
+# remove the stop words in the list above
+tidy_movie_reviews<-tidy_movie_reviews %>%
+      anti_join(stop_words)
+typeof(tidy_movie_reviews)
+
+tidy_movie_reviews %>%
+  count(word) %>%
+    arrange(desc(n))
+```
+
+It looks like 'br' from '</br>' tags in html also feature as the top-most list of frequent words here. We will thus create an additional list and use the anti-join to remove those.
+
+
+```{r}
+# creating an additional list of stop words to be removed
+stop_words2= as.data.frame("br")
+names(stop_words2)[1]<- "word"
+
+# use the same anti join method to remove the additional stop words
+tidy_movie_reviews<-tidy_movie_reviews %>%
+      anti_join(stop_words2)
+
+
+tidy_movie_reviews %>%
+  count(word) %>%
+    arrange(desc(n))
+
+```
+
+
+### White Spaces
+
+```{r}
+# removing white spaces
+tidy_movie_reviews$word <- gsub("\\s+","",tidy_movie_reviews$word)
+tidy_movie_reviews %>%
+  count(word) %>%
+    arrange(desc(n))
+```
+
+### Lemmatization
+
+```{r}
+#Lemmatization
+tidy_movie_reviews<-tidy_movie_reviews %>%
+  filter(word %in% tidy_movie_reviews$word) %>%
+  distinct() %>%
+  mutate(word = textstem::lemmatize_words(word))
+
+
+tidy_movie_reviews %>%
+  count(word) %>%
+    arrange(desc(n))
+```
+
+### Converting to lower case
+
+This step happens automatically in the tidytext format
+
+
+## Question 6- Document Term matrix from corpus
+
+```{r}
+## DTM from corpus
+reviews_DTM <- DocumentTermMatrix(movies_review_corpus, control = list(wordLengths = c(2, Inf)))
+
+inspect(reviews_DTM[1:5,3:9])
+```
+
+
+## Question 7- Document Term matrix from tidytext
+
+```{r}
+## DTM from tidytext
+tidy_reviews_DTM<-
+  tidy_movie_reviews %>%
+  count(id, word) %>%
+  cast_dtm(id, word, n)
+
+inspect(tidy_reviews_DTM[1:5,3:9])
+```
+
+## Question 8- Difference between corpus and tidytext
+
+The biggest difference is in the **structure of the corpus and the tidytext format**. The *corpus also retains every document in its entirety and does not split it into individual terms* or words. The tidytext format *breaks each document into individual terms and assign each term and its frequency to a row*. As a result, we can not visualize the entire document as whole. We see that the corpus document term matrix matches the document-term pairs to IDs defined by the row titles (or indices). However, the document term matrix obtained from the tidytext format uses review ID in the original dataset. This would make it difficult to compare the two results. 
+
+Furthermore, if we look at the **dimensions of the data** in the corpus format, it is of the size of the number of tweets (5000) while the dimensions of the tidytext is of the order of ~380k rows. This difference arises because in the corpus method, the (document) reviews are kept intact and every record corresponds to a document. The tidytext method, however, breaks the document into multiple records with each record corresponding to a word (term) in the document. Thus, the dimension of this dataset is also higher. 
+
+Moreover, the document-term matrix from the tidytext format would be convenient to **map the results back to the original dataset** as the IDs for the document are retained from the original dataset. However, for documents with large number of words or with data that has a lot of documents, the size of the dataset will be huge. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

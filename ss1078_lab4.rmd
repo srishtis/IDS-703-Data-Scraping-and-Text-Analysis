@@ -1,0 +1,409 @@
+---
+title: "Lab 4: Dictionary-Based Analysis"
+output: pdf_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Srishti Saha (ss1078)"
+always_allow_html: yes
+geometry: margin= 0.8cm
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=10, fig.height=7, warning=FALSE, echo=FALSE ,message=FALSE, fig.align = "center", out.width = '40%')
+```
+
+```{r ech-FALSE}
+library(tidytext)
+library(dplyr)
+library(kableExtra)
+library(tm)
+library(stringr)
+library(ggplot2)
+library(reshape)
+library(tidyverse)
+```
+
+
+## Exercise 1: Using the link [here](https://cbail.github.io/ids704/labs/lab4/lab4.html), load the review dataset into your workspace. We will need the columns containing which product the review is for as well as the review text, indicate which columns they are and create a new cleaned dataframe with only these two columns. Print the first few rows of data.
+
+```{r echo=FALSE}
+amazon_review_data<- read.csv("1429_1.csv",stringsAsFactors = FALSE, sep = ",")
+#head(amazon_review_data,5)
+
+amazon_reviews<- amazon_review_data %>% select(name,reviews.text)
+
+#na_count <-sapply(amazon_reviews, function(y) sum(length(which(is.na(y)))))
+#na_count <- data.frame(na_count)
+#na_count
+```
+
+
+The column 'name' mentions the product the review is for along with other descriptions/specifications. However, there are a few missing values in this column which we might have to treat for. (Normally, ASINs are unique product IDs assigned by Amazon to a product- There are 41 unique ASIN combinations (along with 1 missing value.))
+
+```{r echo=FALSE}
+knitr::kable(
+head(amazon_reviews,10),
+format = 'latex',
+caption="Top 10 rows from Amazon product review data",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(1, bold = T, border_right = T, width = "20em") %>%
+  column_spec(2, width = "50em")
+```
+
+
+\newpage
+
+## Exercise 2: Summarize the data by outputting the products reviewed in this dataset as well as the number of reviews per product.
+
+
+```{r}
+summary<- amazon_reviews %>% group_by(name)%>% tally()%>%arrange(desc(n))%>% dplyr::rename(nbr_of_reviews = n)
+
+knitr::kable(
+summary,
+format = 'latex',
+caption="Summary of Amazon product reviews data",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 6)%>%
+  column_spec(1, bold = T, border_right = T, width = "60em")
+```
+
+\newpage
+
+There are 49 distinct items (however, one of them is a blank value with 6760 reviews) with 34660 reviews. The item with the highest number of reviews is 'Fire Tablet, 7 Display, Wi-Fi, 8 GB - Includes Special Offers, Magenta' with 10966 reviews. Following is a plot of the top 20 items with the most number of reviews (excluding the item with blank name)
+
+
+```{r, out.width = '100%'}
+
+top_20<-summary %>%filter(name !='')%>%arrange(desc(nbr_of_reviews)) %>% top_n(20)
+
+
+ggplot(top_20, aes(x=name, y=nbr_of_reviews, fill=nbr_of_reviews,label=as.character(nbr_of_reviews)))+
+  geom_bar(stat="identity",width = 0.8)+
+  geom_text(hjust=0,size=2.5)+
+    theme(text = element_text(size=6),
+        axis.text.x = element_text(angle=90, hjust=1)) +
+  scale_x_discrete("name",labels=scales::wrap_format(width=65))+
+  ggtitle("Summary of top 20 products")+
+  ylab("Number of Reviews for top 20 products")+
+  guides(fill=FALSE)+
+  coord_flip()
+```
+
+
+## Exercise 3: You will see there are 49 products with various review counts. Imagine the case that you are a consumer deciding between two similar products to purchase and are using reviews to help inform this purchase. From our data, select two products that are reasonable to compare and create new dataframes for each product containing only the reviews for that product. Identify which product you chose and print the first few rows of data for each product’s dataframe. Make sure each product has at least 50 reviews. Hint: sort products alphabetically then use the split function.
+
+The two similar products that I am considering for further investigation are:
+
+* **Product 1**: All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 16 GB - Includes Special Offers, Magenta (2814 reviews)
+* **Product 2**: All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 32 GB - Includes Special Offers, Magenta (158 reviews)
+
+The difference between the two products here is the storage capacity of these devices. Sample of the reviews are given below
+
+```{r}
+selected_product1<-amazon_reviews %>% 
+  filter(name == "All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 16 GB - Includes Special Offers, Magenta")
+selected_product1 <- as.data.frame(tibble::rownames_to_column(selected_product1, "SNo"))
+
+selected_product2<-amazon_reviews %>% 
+  filter(name == "All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 32 GB - Includes Special Offers, Magenta")
+selected_product2 <- as.data.frame(tibble::rownames_to_column(selected_product2, "SNo"))
+
+knitr::kable(
+selected_product1%>%top_n(5),
+format = 'latex',
+caption="Sample reviews for Product 1 (All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 16 GB - Includes Special Offers, Magenta)",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(1, bold = T, border_right = T, width = "5em")%>%
+  column_spec(2, bold = T, border_right = T, width = "15em")%>%
+  column_spec(3, bold = T, border_right = T, width = "40em")
+
+knitr::kable(
+selected_product2%>%top_n(5),
+format = 'latex',
+caption="Sample reviews for Product 2 (All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 32 GB - Includes Special Offers, Magenta)",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(1, bold = T, border_right = T, width = "5em")%>%
+  column_spec(2, bold = T, border_right = T, width = "15em")%>%
+  column_spec(3, bold = T, border_right = T, width = "40em")
+
+
+```
+
+\newpage
+
+## Exercise 4: Create a tidy text object for each product’s review data.
+
+```{r echo=TRUE}
+tidy_reviews1<-selected_product1 %>%
+    unnest_tokens("word", reviews.text)
+tidy_reviews2<-selected_product2 %>%
+    unnest_tokens("word", reviews.text)
+```
+
+## Exercise 5: Clean the text of each dataset’s review column as you see fit and find the top 20 frequent words for each product’s reviews. Which words are unique to each product’s top 20 list? Which words appear in both?
+
+We will conduct the following steps to preprocess this text data:
+
+* Removal of Stop words
+* Removal of white spaces
+* Removing numbers
+* Removing intra-word punctiation
+* Lemmatization
+* Converting to lower case words (done automatically for tidytext objects)
+
+### Stop words
+
+```{r echo=TRUE}
+data("stop_words")
+
+# remove the stop words in the list above
+tidy_reviews1<-tidy_reviews1 %>%
+      anti_join(stop_words)
+
+tidy_reviews2<-tidy_reviews2 %>%
+      anti_join(stop_words)
+```
+
+### White Spaces
+
+```{r echo=TRUE}
+# removing white spaces
+tidy_reviews1$word <- gsub("\\s+","",tidy_reviews1$word)
+tidy_reviews2$word <- gsub("\\s+","",tidy_reviews2$word)
+```
+
+### Removing Numbers
+
+```{r echo=TRUE}
+# removing numbers from the words list
+tidy_reviews1<-tidy_reviews1[-grep("\\b\\d+\\b", tidy_reviews1$word),]
+tidy_reviews2<-tidy_reviews2[-grep("\\b\\d+\\b", tidy_reviews2$word),]
+```
+
+### Punctuation
+
+Although interword punctuation is removed in tidytext automatically, we will remove intraword punctuations separately.
+
+```{r echo=TRUE}
+# removing punctuation (intraword)
+tidy_reviews1$word<-removePunctuation(tidy_reviews1$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+
+tidy_reviews2$word<-removePunctuation(tidy_reviews2$word,preserve_intra_word_contractions = FALSE,
+                  preserve_intra_word_dashes = FALSE)
+```
+
+### Lemmatization
+
+```{r echo=TRUE}
+#Lemmatization
+tidy_reviews1<-tidy_reviews1  %>%
+  mutate(word = textstem::lemmatize_words(word))
+
+tidy_reviews2<-tidy_reviews2  %>%
+  mutate(word = textstem::lemmatize_words(word))
+```
+
+### Converting to lower case
+
+This step happens automatically in the tidytext format
+
+**Top 20 words per product**: Table 5 and Table 6
+
+
+```{r}
+# for first product
+top20words1<-tidy_reviews1 %>%
+  count(word) %>%
+    arrange(desc(n))
+
+knitr::kable(
+top20words1%>%top_n(20),
+format = 'latex',
+caption="Top 20 words of product 1: (16 GB version of Fire tablet)",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(1, bold = T, border_right = T, width = "30em")
+
+# for second product
+top20words2<-tidy_reviews2 %>%
+  count(word) %>%
+    arrange(desc(n))
+
+knitr::kable(
+top20words2%>%top_n(20),
+format = 'latex',
+caption="Top 20 words of product 2: (32 GB version of Fire tablet)",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(1, bold = T, border_right = T, width = "30em")
+```
+
+
+**Common words from top 20 list of both products**: Table 7 (17 words)
+
+
+```{r}
+common<-top20words1[1:20,]%>%inner_join(top20words2[1:20,], by="word")%>% dplyr::rename(n1 = n.x)%>% dplyr::rename(n2 = n.y)
+
+knitr::kable(
+common,
+format = 'latex',
+caption="Common words from both products' top 20 list",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)%>%
+  column_spec(1, bold = T, border_right = T, width = "30em")
+```
+
+
+
+**Unique words in top 20 word list for both products**: Table 8 and Table 9 (3 words each)
+
+```{r}
+
+knitr::kable(
+anti_join(top20words1[1:20,],common),
+format = 'latex',
+caption="Words unique to Product 1",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)
+
+knitr::kable(
+anti_join(top20words2[1:20,],common),
+format = 'latex',
+caption="Words unique to Product 2",
+booktabs = T)%>%
+  kable_styling(c("striped", "hover", "condensed", "responsive"),full_width = F, latex_options = "hold_position",font_size = 7)
+```
+
+
+## Exercise 6: Create a dictionary of relevant terms that might aid in our comparison of these two products. Subset the tidytext dataframe that contain these words. What percentage of reviews did you capture with your dictionary for each product?
+
+```{r}
+tablet_review_dictionary<-c("tablet","love","store","gift","time","easy","memory","download","trade","price","app","fast","storage","card","upgrade")
+
+tablet_reviews1<-selected_product1[str_detect(selected_product1$reviews.text, tablet_review_dictionary),]
+tablet_reviews2<-selected_product2[str_detect(selected_product2$reviews.text, tablet_review_dictionary),]
+
+cat("The dictionary consists of the words: \n",
+    tablet_review_dictionary)
+
+cat("Number of reviews selected from Product 1 (16 GB) is: ",
+    nrow(tablet_reviews1), "\n",
+    " and number of reviews from Product 2 (32 GB) is: ",
+    nrow(tablet_reviews2) )
+```
+
+Out of a total list of 2972 reviews, the dictionary filtered 250 reviews for both products combined. The original dataset had 2814 reviews for 'All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 16 GB - Includes Special Offers, Magenta' and 158 reviews for 'All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 32 GB - Includes Special Offers, Magenta'. After filtering as per the dictionary, we had 232 and 18 products for them respectively. This is a 91.75% reduction in the number of reviews for the first product (16 GB version) and a 88.60% reduction in the number of reviews for the second product (32 GB version).
+
+\newpage
+
+## Exercise 7: Perform a sentiment analysis on each individual review and then average your results for the entire set using the bing sentiment dictionary. Based on your results, which product would you choose to purchase?
+
+### Using 'afinn' dictionary
+
+```{r}
+#head(get_sentiments("afinn"))
+
+reviews_sentiment1 <-  tidy_reviews1 %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(SNo) %>% 
+  summarise(sentiment = sum(value)) 
+
+#head(reviews_sentiment1,20)
+```
+
+```{r}
+reviews_sentiment2 <-  tidy_reviews2 %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(SNo) %>% 
+  summarise(sentiment = sum(value)) 
+
+#head(reviews_sentiment2,20)
+```
+
+
+```{r, out.width = '100%', fig.height=5}
+reviews_sentiment1 %>%
+  ggplot(aes(SNo, sentiment)) +
+  geom_col(show.legend = FALSE) +
+    theme(text = element_text(size=6),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ggtitle("Overall sentiment scores for all reviews from product 1 (afinn)")+ 
+  xlab("Reviews")
+```
+
+```{r, out.width = '100%', fig.height=5}
+reviews_sentiment2 %>%
+  ggplot(aes(SNo, sentiment)) +
+  geom_col(show.legend = FALSE) +
+    theme(text = element_text(size=6),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ggtitle("Overall sentiment scores for all reviews from product 2 (afinn)")+ 
+  xlab("Reviews")
+```
+
+
+
+From the above, just by eye-balling we see that both products seems to have a similar proportion of negative reviews. The negative reviews are lower than the positive reviews. 396 out of 2250 reviews (17.6%) have a negative sentiment score assigned to them. For product 2, 23 out of 130 (17.7%) reviews are negative. However, Product 2 (32 GB version) has a higher maximum positive sentiment score (22) than Product 1 (20). It also has a higher average sentiment score (3.22) than Product 1 (2.76). Thus, just from the above analysis, **I would lean towards Product 2 (32 GB version) than Product 1.**
+
+### Using 'bing' dictionary
+
+```{r echo=TRUE}
+
+## product 1
+reviews_sentiment_bing1 <- tidy_reviews1 %>%
+  inner_join(get_sentiments("bing")) %>%
+    count(SNo, sentiment) 
+
+reviews_sentiment1_summary<-cast(reviews_sentiment_bing1, SNo ~ sentiment)%>% 
+  replace_na(list(positive = 0, negative = 0))%>%
+  mutate(sentiment_score=positive-negative)
+
+
+## product 2
+reviews_sentiment_bing2 <- tidy_reviews2 %>%
+  inner_join(get_sentiments("bing")) %>%
+    count(SNo, sentiment) 
+
+reviews_sentiment2_summary<-cast(reviews_sentiment_bing2, SNo ~ sentiment)%>% 
+  replace_na(list(positive = 0, negative = 0))%>%
+  mutate(sentiment_score=positive-negative)
+
+```
+```{r , out.width = '100%', fig.height=5}
+reviews_sentiment1_summary %>%
+  ggplot(aes(SNo, sentiment_score)) +
+  geom_col(show.legend = FALSE) +
+    theme(text = element_text(size=6),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ggtitle("Overall sentiment scores for all reviews from product 1 (bing)")+ 
+  xlab("Reviews")
+
+reviews_sentiment2_summary %>%
+  ggplot(aes(SNo, sentiment_score)) +
+  geom_col(show.legend = FALSE) +
+    theme(text = element_text(size=6),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ggtitle("Overall sentiment scores for all reviews from product 2 (bing)")+ 
+  xlab("Reviews")
+```
+
+We see a similar trend using sentiment analysis plots from the bing disctionary. Let us look at the actual statistics of these scores to make a more informed comparison.
+
+\newpage
+
+```{r}
+comparison_dataframe <- data.frame("Product" = c("Product 1 (16 GB)", "Product 2 (32 GB)"), "Proportion of negative reviews" = c(round(nrow(reviews_sentiment1_summary[reviews_sentiment1_summary$sentiment_score<=0,])/nrow(reviews_sentiment1_summary),3), round(nrow(reviews_sentiment2_summary[reviews_sentiment2_summary$sentiment_score<=0,])/nrow(reviews_sentiment2_summary),3)),"Max Positive sentiment score"=c(max(reviews_sentiment1_summary$sentiment_score),max(reviews_sentiment2_summary$sentiment_score)),"Average sentiment score"=c(mean(reviews_sentiment1_summary$sentiment_score),mean(reviews_sentiment2_summary$sentiment_score)))
+
+kable(comparison_dataframe, caption = "Product Comparison") %>% kable_styling(position = 'center')
+```
+
+From the above table and the plots, I am still favoring product 2 as it has a slightly higher average sentiment score and have almost similar proportion of negative reviews (as was seen in the case with 'afinn' dictionary). Moreover, by definition the second product has higher memory which is suitable for me and hence, as a customer, I would choose to purchase the second product **(All-New Fire HD 8 Tablet, 8 HD Display, Wi-Fi, 32 GB - Includes Special Offers, Magenta)**

@@ -1,0 +1,56 @@
+---
+title: "Lab 2: Screen-Scraping"
+output: pdf_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Srishti Saha (ss1078)"
+always_allow_html: yes
+geometry: margin= 0.8cm
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=7, fig.height=4, echo=TRUE, warning=FALSE, message=FALSE, fig.align = "center", out.width = '40%')
+```
+
+```{r echo=FALSE}
+library(rvest)
+#install.packages("RSelenium")
+library(RSelenium)
+library(kableExtra)
+```
+
+
+## Question 1: Navigate to the wikipedia page on highest grossing films. One there, utlize the inspect function of your web browswer in conjuection with RVest to copy the table of highest grossing films. Print out the head() of this table
+
+```{r}
+films_wiki<-read_html("https://en.wikipedia.org/wiki/List_of_highest-grossing_films")
+films_table_section<-html_node(films_wiki, xpath='//*[@id="mw-content-text"]/div/table[1]')
+#head(films_table_section)
+films_table<-html_table(films_table_section)
+
+
+knitr::kable(
+head(films_table),
+format = 'latex',
+caption="Top 5 highest grossing films",
+booktabs = T
+)%>%kable_styling(c("striped","condensed"),full_width = F, latex_options = "hold_position",font_size = 7)
+```
+
+
+
+
+## Question 3: Unfortunately data we want isn’t always as nicely structured as a wikipedia table. Navigate to a this blog post about famous movie quotes. Using the Selector Gadget for you browser, pull the first 10 quotes from the list, print the results.
+
+```{r}
+quotes_page<-read_html("https://blog.hubspot.com/sales/famous-movie-quotes")
+quotes<-html_nodes(quotes_page, css="p:nth-child(13) , p:nth-child(12) , 
+                   p:nth-child(11) , p:nth-child(10) , p:nth-child(9) , p:nth-child(8) , p:nth-child(7) ,
+                   p:nth-child(6) , p:nth-child(5) , p:nth-child(4)  , p:nth-child(3) .epsilon")
+
+```
+The above quite will store the quotes in an object.
+
+```{r echo=FALSE}
+print(quotes[2:11])
+```
+
